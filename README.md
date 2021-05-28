@@ -6,9 +6,13 @@ To cite this code, cite the corresponding paper and link to this URL. If you hav
 
 # Dependencies
 `qiskit`
+
 `numpy`
+
 `scipy`
+
 `cupy` (optional; only if you want to use a GPU to perform classical evaluations)
+
 `qiskit-aer-gpu` (optional; only for qiskit aer simulations using the gpu)
 
 
