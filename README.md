@@ -5,15 +5,21 @@ This code allows you to reproduce the experiments performed by Rosenberg et al (
 To cite this code, cite the corresponding paper and link to this URL. If you have any questions or comments about this code, please contact Eliott Rosenberg at enr27--at--cornell--dot--edu.
 
 # Dependencies
-`qiskit`
+Version numbers indicate the version I used. Other versions may also be compatible.
 
-`numpy`
+`qiskit 0.23.0`
 
-`scipy`
+`qiskit-aer 0.7.0`
 
-`cupy` (optional; only if you want to use a GPU to perform classical evaluations)
+`qiskit-ibmq-provider 0.11.0`
 
-`qiskit-aer-gpu` (optional; only for qiskit aer simulations using the gpu)
+`numpy 1.19.1`
+
+`scipy 1.5.2`
+
+`cupy 8.0.0` (optional; only if you want to use a GPU to perform classical evaluations)
+
+`qiskit-aer-gpu 0.7.4` (optional; only for qiskit aer simulations using the gpu)
 
 
 # Getting started
