@@ -1,8 +1,5 @@
 # Overview
-This code allows you to reproduce the experiments performed by Rosenberg et al (2021). Specifically, it contains functions to optimize variational ansatze both classically and hybridly, as well as functions to implement a variety of error mitigation techniques.
-
-# To cite
-To cite this code, cite the corresponding paper and link to this URL. If you have any questions or comments about this code, please contact Eliott Rosenberg at enr27--at--cornell--dot--edu.
+This code allows you to reproduce the experiments performed by Rosenberg _et al_. [arXiv:2106.01264](https://arxiv.org/abs/2106.01264) (2021). Specifically, it contains functions to optimize variational ansatze both classically and hybridly, as well as functions to implement a variety of error-mitigation techniques.
 
 # Dependencies
 Version numbers indicate the version I used. Other versions may also be compatible.
@@ -46,3 +43,19 @@ If you want to test the various error mitigation techniques described in Rosenbe
 
 
 `library.py` contains functions that are called by functions in the other files. (Although some functions in `energy_evaluation.py` are called in `error_mitigation.py`, etc.)
+
+# How to cite this code
+
+If you use this code in your research, please consider citing the following paper:
+
+>E. Rosenberg, P. Ginsparg, and P.L. McMahon. Experimental error mitigation using linear rescaling for variational quantum eigensolving with up to 20 qubits. [arXiv:2106.01264](https://arxiv.org/abs/2106.01264) (2021)
+
+If you have any questions or comments about this code, please contact Eliott Rosenberg at enr27--at--cornell--dot--edu.
+
+# License
+
+The code in this repository is released under the following license:
+
+[Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/)
+
+A copy of this license is given in this repository as [license.txt](https://github.com/mcmahon-lab/error_mitigation_vqe/blob/main/license.txt).
