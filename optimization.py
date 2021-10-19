@@ -14,9 +14,9 @@ from datetime import datetime
 
 # if you use a gpu, change this to set which gpu you use
 global whichGPU
-whichGPU = 0
+whichGPU = 3
 
-# replace "/your_directory/" with the desired directory for saved parameters
+# replace "/your_directory/saved_parameters/" with the desired directory for saved parameters
 
 def pauli(i):
 	# i = 1 for x, 2 for y, 3 for z
@@ -485,9 +485,9 @@ def E_from_theta(theta,paulis_in_H,coeffs,output_gradient=True,directory='ising'
 		E = E[0]
 	if saveOutput:
 		if directory == 'ising':
-			directory = '/your_directory/ising/ALAy_cx/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
+			directory = '/your_directory/saved_parameters/ising/ALAy_cx/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
 		else:
-			directory = '/your_directory/'+directory
+			directory = '/your_directory/saved_parameters/'+directory
 		saveParams(theta,E,directory)
 	print(E)
 	if output_gradient:
@@ -554,7 +554,7 @@ def ising_E_from_theta_lc(theta,n,hx,hz,output_gradient=False,saveOutput=True,di
 		E = E[0]
 	if saveOutput:
 		if directory=='default':
-			directory = '/your_directory/ising/ALAy_cx/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
+			directory = '/your_directory/saved_parameters/ising/ALAy_cx/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
 		saveParams(theta,E,directory)
 	print(E)
 	if output_gradient:
@@ -571,13 +571,13 @@ def ising_E_from_theta(theta,n,hx,hz,output_gradient=False,directory='default',a
 	if directory == 'default':
 		if ansatz=='PSA':
 			l = (len(theta)-3*n)//(9*n//2)
-			directory = '/your_directory/ising/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
+			directory = '/your_directory/saved_parameters/ising/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
 		elif ansatz=='ALAy' and includeH:
 			l = (len(theta)-n)//n
-			directory = '/your_directory/ising/ALAy/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
+			directory = '/your_directory/saved_parameters/ising/ALAy/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
 		elif ansatz=='ALAy' and not includeH:
 			l = (len(theta)-n)//n
-			directory = '/your_directory/ising/ALAy_cx/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
+			directory = '/your_directory/saved_parameters/ising/ALAy_cx/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
 	if ansatz == 'PSA':
 		psi = ALA_state(theta,n,output_gradient=output_gradient)
 	elif ansatz == 'ALAy':
@@ -651,7 +651,7 @@ def ising_E_from_theta_gpu(theta,n,hx,hz,output_gradient=False,saveOutput=True,d
 		E = E[0]
 	if saveOutput:
 		if directory == 'default':
-			directory = '/your_directory/ising/ALAy_cx/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
+			directory = '/your_directory/saved_parameters/ising/ALAy_cx/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
 		saveParams(theta,E,directory)
 	print(E)
 	if output_gradient:
@@ -728,7 +728,7 @@ def ising_E_from_theta_lc_gpu(theta,n,hx,hz,output_gradient=False,saveOutput=Tru
 		E = E[0]
 	if saveOutput:
 		if directory == 'default':
-			directory = '/your_directory/ising/ALAy_cx/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
+			directory = '/your_directory/saved_parameters/ising/ALAy_cx/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
 		saveParams(theta,E,directory)
 	print(E)
 	if output_gradient:
@@ -742,7 +742,7 @@ def ising_E_from_theta_lc_symm(theta,n,hx,hz,output_gradient=False,gpu=False,sav
 	from library import theta_ALAy_to_symm
 	l = (len(theta)-2)//2
 	theta_full = [ theta[theta_ALAy_to_symm(which_theta,n)] for which_theta in range(n*(l+1))]
-	directory='/your_directory/ising/ALAy_symm/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
+	directory='/your_directory/saved_parameters/ising/ALAy_symm/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)
 	if gpu:
 		E = ising_E_from_theta_lc_gpu(theta_full,n,hx,hz,output_gradient=output_gradient,saveOutput=saveOutput,directory=directory)
 	elif not gpu:
@@ -761,7 +761,7 @@ def heisenberg_E_from_theta_lc_symm(theta,n,J,B,output_gradient=False,gpu=True,s
 	from library import theta_ALAy_to_symm
 	l = (len(theta)-2)//2
 	theta_full = [ theta[theta_ALAy_to_symm(which_theta,n)] for which_theta in range(n*(l+1))]
-	directory='/your_directory/Heisenberg/ALAy_symm/n'+str(n)+'_l'+str(l)+'_B'+str(B)+'_J'+str(J)
+	directory='/your_directory/saved_parameters/Heisenberg/ALAy_symm/n'+str(n)+'_l'+str(l)+'_B'+str(B)+'_J'+str(J)
 	if gpu:
 		E = Heisenberg_E_from_theta_lc_gpu(theta_full,n,J,B,output_gradient=output_gradient,saveOutput=saveOutput,directory=directory)
 	elif not gpu:
@@ -844,7 +844,7 @@ def Heisenberg_E_from_theta_lc(theta,n,J,B,output_gradient=False,saveOutput=True
 		E = E[0]
 	if saveOutput:
 		if directory=='default':
-			directory = '/your_directory/Heisenberg/ALAy_cx/n'+str(n)+'_l'+str(l)+'_B'+str(B)+'_J'+str(J)
+			directory = '/your_directory/saved_parameters/Heisenberg/ALAy_cx/n'+str(n)+'_l'+str(l)+'_B'+str(B)+'_J'+str(J)
 		saveParams(theta,E,directory)
 	print(E)
 	if output_gradient:
@@ -927,7 +927,7 @@ def Heisenberg_E_from_theta_lc_gpu(theta,n,J,B,output_gradient=False,saveOutput=
 		E = E[0]
 	if saveOutput:
 		if directory=='default':
-			directory = '/your_directory/Heisenberg/ALAy_cx/n'+str(n)+'_l'+str(l)+'_B'+str(B)+'_J'+str(J)
+			directory = '/your_directory/saved_parameters/Heisenberg/ALAy_cx/n'+str(n)+'_l'+str(l)+'_B'+str(B)+'_J'+str(J)
 		saveParams(theta,E,directory)
 	print(E)
 	if output_gradient:
@@ -935,6 +935,149 @@ def Heisenberg_E_from_theta_lc_gpu(theta,n,J,B,output_gradient=False,saveOutput=
 	else:
 		return E
 		
+
+
+
+def XY_E_from_theta_lc(theta,n,Jz,Jxy,output_gradient=False,saveOutput=True,directory='default'):
+	# ansatz is ALAy_cx.
+	l = (len(theta)-n)//n
+	if output_gradient:
+		E = np.zeros(len(theta)+1)
+	elif not output_gradient:
+		E = 0
+		
+	for i in range(n):
+		qubits_measured = [i,(i+1)%n]
+		lc = light_cone(l,qubits_measured,n)
+		qubits_in_lc = list(lc[0])
+		m = len(qubits_in_lc)
+		psi = ALAy_state_lc(theta,n,qubits_measured,output_gradient)
+		
+		vq = qubits_in_lc.index(i)
+		ket = P_i(3,psi,vq,leave_first_index=output_gradient)
+		
+		# ZZ:
+		vq2 = qubits_in_lc.index( (i+1)%n)
+		ket = P_i(3,ket,vq2,leave_first_index=output_gradient)
+		if output_gradient:
+			P = np.real(np.tensordot( np.conj(psi[0]), ket, axes = (range(m),range(1,m+1)) ))
+			P[1:] = 2*P[1:]
+			thetas_in_lc = np.array(thetas_in_light_cone_ALAy(l,qubits_measured,n))
+			E[ np.insert(thetas_in_lc+1,0,0)] += Jz*P
+		elif not output_gradient:
+			P = np.vdot(psi,ket).real
+			E += Jz*P
+		
+		# XX:
+		ket = P_i(1,psi,vq,leave_first_index=output_gradient)
+		ket = P_i(1,ket,vq2,leave_first_index=output_gradient)
+		if output_gradient:
+			P = np.real(np.tensordot( np.conj(psi[0]), ket, axes = (range(m),range(1,m+1)) ))
+			P[1:] = 2*P[1:]
+			thetas_in_lc = np.array(thetas_in_light_cone_ALAy(l,qubits_measured,n))
+			E[ np.insert(thetas_in_lc+1,0,0)] -= Jxy*P
+		elif not output_gradient:
+			P = np.vdot(psi,ket).real
+			E += -Jxy*P
+			
+		# YY:
+		ket = P_i(2,psi,vq,leave_first_index=output_gradient)
+		ket = P_i(2,ket,vq2,leave_first_index=output_gradient)
+		if output_gradient:
+			P = np.real(np.tensordot( np.conj(psi[0]), ket, axes = (range(m),range(1,m+1)) ))
+			P[1:] = 2*P[1:]
+			thetas_in_lc = np.array(thetas_in_light_cone_ALAy(l,qubits_measured,n))
+			E[ np.insert(thetas_in_lc+1,0,0)] -= Jxy*P
+		elif not output_gradient:
+			P = np.vdot(psi,ket).real
+			E -= Jxy*P
+					
+	if output_gradient:
+		dE = E[1:]
+		E = E[0]
+	if saveOutput:
+		if directory=='default':
+			directory = '/your_directory/saved_parameters/XY/ALAy_cx/n'+str(n)+'_l'+str(l)+'_Jz'+str(Jz)+'_Jxy'+str(Jxy)
+		saveParams(theta,E,directory)
+	print(E)
+	if output_gradient:
+		return (E,dE)
+	else:
+		return E
+
+
+
+
+def XY_E_from_theta_lc_gpu(theta,n,Jz,Jxy,output_gradient=False,saveOutput=True,directory='default'):
+	import cupy as cp
+	global whichGPU
+	cp.cuda.Device(whichGPU).use()
+	l = (len(theta)-n)//n
+	if output_gradient:
+		E = np.zeros(len(theta)+1)
+	elif not output_gradient:
+		E = 0
+		
+	for i in range(n):
+		qubits_measured = [i,(i+1)%n]
+		lc = light_cone(l,qubits_measured,n)
+		qubits_in_lc = list(lc[0])
+		m = len(qubits_in_lc)
+		psi = ALAy_state_lc_gpu(theta,n,qubits_measured,output_gradient)
+		
+		vq = qubits_in_lc.index(i)
+		ket = P_i(3,psi,vq,leave_first_index=output_gradient,gpu=True)
+		
+		# ZZ:
+		vq2 = qubits_in_lc.index( (i+1)%n)
+		ket = P_i(3,ket,vq2,leave_first_index=output_gradient,gpu=True)
+		if output_gradient:
+			P = cp.real(cp.tensordot( cp.conj(psi[0]), ket, axes = (range(m),range(1,m+1)) )).get()
+			P[1:] = 2*P[1:]
+			thetas_in_lc = np.array(thetas_in_light_cone_ALAy(l,qubits_measured,n))
+			E[ np.insert(thetas_in_lc+1,0,0)] += Jz*P
+		elif not output_gradient:
+			P = cp.real(cp.vdot(psi,ket)).get()
+			E += Jz*P
+		
+		# XX:
+		ket = P_i(1,psi,vq,leave_first_index=output_gradient,gpu=True)
+		ket = P_i(1,ket,vq2,leave_first_index=output_gradient,gpu=True)
+		if output_gradient:
+			P = cp.real(cp.tensordot( cp.conj(psi[0]), ket, axes = (range(m),range(1,m+1)) )).get()
+			P[1:] = 2*P[1:]
+			thetas_in_lc = np.array(thetas_in_light_cone_ALAy(l,qubits_measured,n))
+			E[ np.insert(thetas_in_lc+1,0,0)] -= Jxy*P
+		elif not output_gradient:
+			P = cp.real(cp.vdot(psi,ket)).get()
+			E -= Jxy*P
+			
+		# YY:
+		ket = P_i(2,psi,vq,leave_first_index=output_gradient,gpu=True)
+		ket = P_i(2,ket,vq2,leave_first_index=output_gradient,gpu=True)
+		if output_gradient:
+			P = cp.real(cp.tensordot( cp.conj(psi[0]), ket, axes = (range(m),range(1,m+1)) )).get()
+			P[1:] = 2*P[1:]
+			thetas_in_lc = np.array(thetas_in_light_cone_ALAy(l,qubits_measured,n))
+			E[ np.insert(thetas_in_lc+1,0,0)] -= Jxy*P
+		elif not output_gradient:
+			P = cp.real(cp.vdot(psi,ket)).get()
+			E -= Jxy*P
+					
+	if output_gradient:
+		dE = E[1:]
+		E = E[0]
+	if saveOutput:
+		if directory=='default':
+			directory = '/your_directory/saved_parameters/XY/ALAy_cx/n'+str(n)+'_l'+str(l)+'_Jz'+str(Jz)+'_Jxy'+str(Jxy)
+		saveParams(theta,E,directory)
+	print(E)
+	if output_gradient:
+		return (E,dE)
+	else:
+		return E
+
+
 
 
 
@@ -1053,9 +1196,36 @@ def heisenberg_H(J,psi,output_gradient=False,add_stochastic_noise=False,shots=10
 
 
 
+def XY_H(Jz,Jxy,psi,output_gradient=False):
+	ket = np.zeros_like(psi)
+	if not output_gradient:
+		n = int(np.log2(np.size(psi)))
+	elif output_gradient:
+		n = len(np.shape(psi))-1
+	for i in range(n):
+		Zi = P_i(3,psi,i,leave_first_index=output_gradient)
+		ket += Jz*P_i(3,Zi,(i+1)%n,leave_first_index=output_gradient)
+
+		Xi = P_i(1,psi,i,leave_first_index=output_gradient)
+		ket -= Jxy*P_i(1,Xi,(i+1)%n,leave_first_index=output_gradient)
+		
+		Yi = P_i(2,psi,i,leave_first_index=output_gradient)
+		ket -= Jxy*P_i(2,Yi,(i+1)%n,leave_first_index=output_gradient)
+	if output_gradient:
+		E = np.real(np.tensordot( np.conj(psi[0]), ket, axes = (range(n),range(1,n+1)) ))
+		E[1:] = 2*E[1:]
+		return E
+	elif not output_gradient:
+		return np.vdot(psi,ket).real
+		
+		
+		return E
+
+
+
 def optimize(n,l,hx=1.5,hz=0.1,method='BFGS',gpu=True,start_from_saved=False,theta0=[],jac=True):
 	if start_from_saved:
-		theta0 = np.genfromtxt('/your_directory/ising/ALAy_cx/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)+'/theta.csv',delimiter=',')
+		theta0 = np.genfromtxt('/your_directory/saved_parameters/ising/ALAy_cx/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)+'/theta.csv',delimiter=',')
 	elif len(theta0) == 0:
 		theta0 = np.random.rand(n+l*n)*2*np.pi
 	if gpu:
@@ -1069,17 +1239,17 @@ def optimize(n,l,hx=1.5,hz=0.1,method='BFGS',gpu=True,start_from_saved=False,the
 def optimize_symm(n,l,hx,hz,method='BFGS',maxiter=2000,jac=False,start_from_saved=False,gpu=True,theta0=[],start_from_previous_hx=False,start_from_next_hx=False):
 	if start_from_previous_hx:
 		if hx == 0.3:
-			theta0 = np.genfromtxt('/your_directory/ising/ALAy_symm/n'+str(n)+'_l'+str(l)+'_hx0.2_hz'+str(hz)+'/theta.csv')
+			theta0 = np.genfromtxt('/your_directory/saved_parameters/ising/ALAy_symm/n'+str(n)+'_l'+str(l)+'_hx0.2_hz'+str(hz)+'/theta.csv')
 		elif hx == 0.4:
-			theta0 = np.genfromtxt('/your_directory/ising/ALAy_symm/n'+str(n)+'_l'+str(l)+'_hx0.3_hz'+str(hz)+'/theta.csv')
+			theta0 = np.genfromtxt('/your_directory/saved_parameters/ising/ALAy_symm/n'+str(n)+'_l'+str(l)+'_hx0.3_hz'+str(hz)+'/theta.csv')
 		elif hx == 0.5:
-			theta0 = np.genfromtxt('/your_directory/ising/ALAy_symm/n'+str(n)+'_l'+str(l)+'_hx0.4_hz'+str(hz)+'/theta.csv')
+			theta0 = np.genfromtxt('/your_directory/saved_parameters/ising/ALAy_symm/n'+str(n)+'_l'+str(l)+'_hx0.4_hz'+str(hz)+'/theta.csv')
 		elif hx == 0.2:
-			theta0 = np.genfromtxt('/your_directory/ising/ALAy_symm/n'+str(n)+'_l'+str(l)+'_hx0.1_hz'+str(hz)+'/theta.csv')
+			theta0 = np.genfromtxt('/your_directory/saved_parameters/ising/ALAy_symm/n'+str(n)+'_l'+str(l)+'_hx0.1_hz'+str(hz)+'/theta.csv')
 	elif start_from_next_hx:
-		theta0 = np.genfromtxt('/your_directory/ising/ALAy_symm/n'+str(n)+'_l'+str(l)+'_hx'+str(hx+0.1)+'_hz'+str(hz)+'/theta.csv')
+		theta0 = np.genfromtxt('/your_directory/saved_parameters/ising/ALAy_symm/n'+str(n)+'_l'+str(l)+'_hx'+str(hx+0.1)+'_hz'+str(hz)+'/theta.csv')
 	elif start_from_saved:
-		theta0 = np.genfromtxt('/your_directory/ising/ALAy_symm/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)+'/theta.csv')
+		theta0 = np.genfromtxt('/your_directory/saved_parameters/ising/ALAy_symm/n'+str(n)+'_l'+str(l)+'_hx'+str(hx)+'_hz'+str(hz)+'/theta.csv')
 	if len(theta0) > 2*(l+1):
 		theta0_symm = np.zeros(2+2*l)
 		from library import theta_ALAy_to_symm
@@ -1095,9 +1265,9 @@ def optimize_symm(n,l,hx,hz,method='BFGS',maxiter=2000,jac=False,start_from_save
 
 def optimize_symm_Heisenberg(n,l,J,B,method='TNC',maxiter=2000,jac=True,start_from_saved=False,gpu=False,start_from_previous_l=False,theta0=[]):
 	if start_from_saved:
-		theta0 = np.genfromtxt('/your_directory/Heisenberg/ALAy_symm/n'+str(n)+'_l'+str(l)+'_B'+str(B)+'_J'+str(J)+'/theta.csv')
+		theta0 = np.genfromtxt('/your_directory/saved_parameters/Heisenberg/ALAy_symm/n'+str(n)+'_l'+str(l)+'_B'+str(B)+'_J'+str(J)+'/theta.csv')
 	elif start_from_previous_l:
-		theta0 = np.genfromtxt('/your_directory/Heisenberg/ALAy_symm/n'+str(n)+'_l'+str(l-1)+'_B'+str(B)+'_J'+str(J)+'/theta.csv')
+		theta0 = np.genfromtxt('/your_directory/saved_parameters/Heisenberg/ALAy_symm/n'+str(n)+'_l'+str(l-1)+'_B'+str(B)+'_J'+str(J)+'/theta.csv')
 		theta0_symm = np.zeros(2*l)
 		from library import theta_ALAy_to_symm
 		for i in range(len(theta0)):
@@ -1118,7 +1288,7 @@ def optimize_symm_Heisenberg(n,l,J,B,method='TNC',maxiter=2000,jac=True,start_fr
 
 def optimize_Heisenberg(n,l,J,B,method='TNC',start_from_saved=False,start_from_previous_l=False,gpu=False,theta0=[],jac=True):
 	if start_from_previous_l:
-		theta0 = np.genfromtxt('/your_directory/Heisenberg/ALAy_cx/n'+str(n)+'_l'+str(l-1)+'_B'+str(B)+'_J'+str(J)+'/theta.csv')
+		theta0 = np.genfromtxt('/your_directory/saved_parameters/Heisenberg/ALAy_cx/n'+str(n)+'_l'+str(l-1)+'_B'+str(B)+'_J'+str(J)+'/theta.csv')
 		# cyclically permute thetas
 		for layer in range(l+1):
 			theta_l = theta0[n*l:(n*(l+1))]
@@ -1126,8 +1296,8 @@ def optimize_Heisenberg(n,l,J,B,method='TNC',start_from_saved=False,start_from_p
 			theta0[n*l:(n*(l+1))] = theta_l
 		theta0 = np.concatenate( (np.zeros(n), theta0) )
 	elif start_from_saved:
-		theta0 = np.genfromtxt('/your_directory/Heisenberg/ALAy_cx/n'+str(n)+'_l'+str(l)+'_B'+str(B)+'_J'+str(J)+'/theta.csv')
-		#theta0 = np.genfromtxt('/your_directory/Heisenberg/ALAy_symm/n'+str(n)+'_l'+str(l)+'_B'+str(B)+'_J'+str(J)+'/theta.csv')
+		theta0 = np.genfromtxt('/your_directory/saved_parameters/Heisenberg/ALAy_cx/n'+str(n)+'_l'+str(l)+'_B'+str(B)+'_J'+str(J)+'/theta.csv')
+		#theta0 = np.genfromtxt('/your_directory/saved_parameters/Heisenberg/ALAy_symm/n'+str(n)+'_l'+str(l)+'_B'+str(B)+'_J'+str(J)+'/theta.csv')
 	elif len(theta0)==0:
 		theta0 = np.random.rand(n+l*n)*2*np.pi
 	if gpu:
@@ -1135,6 +1305,26 @@ def optimize_Heisenberg(n,l,J,B,method='TNC',start_from_saved=False,start_from_p
 	else:
 		return minimize(Heisenberg_E_from_theta_lc,theta0,args=(n,J,B,jac),method=method,jac=jac)
 
+
+
+def optimize_XY(n,l,Jz,Jxy,method='TNC',start_from_saved=False,start_from_previous_l=False,gpu=False,theta0=[],jac=True):
+	if start_from_previous_l:
+		theta0 = np.genfromtxt('/your_directory/saved_parameters/XY/ALAy_cx/n'+str(n)+'_l'+str(l-1)+'_Jz'+str(Jz)+'_Jxy'+str(Jxy)+'/theta.csv')
+		# cyclically permute thetas
+		for layer in range(l+1):
+			theta_l = theta0[n*l:(n*(l+1))]
+			theta_l = np.roll(theta_l,-1)
+			theta0[n*l:(n*(l+1))] = theta_l
+		theta0 = np.concatenate( (np.zeros(n), theta0) )
+	elif start_from_saved:
+		theta0 = np.genfromtxt('/your_directory/saved_parameters/XY/ALAy_cx/n'+str(n)+'_l'+str(l)+'_Jz'+str(Jz)+'_Jxy'+str(Jxy)+'/theta.csv')
+		#theta0 = np.genfromtxt('/your_directory/saved_parameters/Heisenberg/ALAy_symm/n'+str(n)+'_l'+str(l)+'_B'+str(B)+'_J'+str(J)+'/theta.csv')
+	elif len(theta0)==0:
+		theta0 = np.random.rand(n+l*n)*2*np.pi
+	if gpu:
+		return minimize(XY_E_from_theta_lc_gpu,theta0,args=(n,Jz,Jxy,jac),method=method,jac=jac)
+	else:
+		return minimize(XY_E_from_theta_lc,theta0,args=(n,Jz,Jxy,jac),method=method,jac=jac)
 
 
 	

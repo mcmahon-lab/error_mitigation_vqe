@@ -1,6 +1,7 @@
 import numpy as np
 from library import *
 from datetime import datetime
+from energy_evaluation import read_from_tags
 ## To reproduce Figures 6-9, do the following:
 
 ################# Step 1 ###############################
@@ -29,14 +30,14 @@ def optimize_all_symm(n=12,hz=0.1):
 
 
 ############# Step 2 #########################
-## Next, to compare the optimization methods, submit ansatz circuits with the optimized parameters, in addition to \theta=0 circuits.
+## Next, to compare the mitigation methods, submit ansatz circuits with the optimized parameters, in addition to \theta=0 circuits.
 
 
 # use something like the following. It will need to be modified for your directory and whether you imposed permutation symmetry
-def submit_saved_params(n,l,hx,backend_name,hz=0.1):
+def submit_saved_params(n,l,hx,backend_name,hz=0.1,rand_compile=True,noise_scale=1):
 	from energy_evaluation import submit_ising, submit_ising_symm
 	
-	my_directory = '/your_directory/'
+	my_directory = '/your_directory/saved_parameters/'
 	if not hasattr(l,'__iter__'):
 		l = [l]
 	if not hasattr(hx,'__iter__'):
@@ -53,11 +54,11 @@ def submit_saved_params(n,l,hx,backend_name,hz=0.1):
 			E = float(np.genfromtxt(base_dir+'n'+str(n)+'_l'+str(li)+'_hx'+str(hxi)+'_hz'+str(hz)+'/E.csv'))
 			theta = np.genfromtxt(base_dir+'n'+str(n)+'_l'+str(li)+'_hx'+str(hxi)+'_hz'+str(hz)+'/theta.csv',delimiter=',')
 			if not symm:
-				submit_ising(n,theta,backend_name,shots=1024,hx=hxi,hz=hz,E=E)
+				submit_ising(n,theta,backend_name,shots=1024,hx=hxi,hz=hz,E=E,rand_compile=rand_compile,noise_scale=noise_scale)
 			elif symm:
-				submit_ising_symm(n,theta,backend_name,shots=8192,hx=hxi,hz=hz,E=E,input_condensed_theta=False)
+				submit_ising_symm(n,theta,backend_name,shots=8192,hx=hxi,hz=hz,E=E,input_condensed_theta=False,rand_compile=rand_compile,noise_scale=noise_scale)
 				
-def submit_zero_calibration(n,l,backend_name):
+def submit_zero_calibration(n,l,backend_name,rand_compile=True,noise_scale=1):
 	from energy_evaluation import all_ising_Paulis_symm, submit_circuits
 	
 	if not hasattr(l,'__iter__'):
@@ -66,7 +67,7 @@ def submit_zero_calibration(n,l,backend_name):
 	whichPauli = all_ising_Paulis_symm(n)
 	for li in l:
 		theta = np.zeros(n*(li+1))
-		submit_circuits(theta,whichPauli,backend_name,tags=['zero_theta_calibration'],shots=8192)
+		submit_circuits(theta,whichPauli,backend_name,tags=['zero_theta_calibration'],shots=8192,rand_compile=rand_compile,noise_scale=noise_scale)
 
 ## It is important that the backend is not recalibrated between when any of the above jobs run. To check the latest calibration datetime use
 
@@ -112,7 +113,7 @@ def latest_calibration_date_from_job(job_id):
 
 # The observed damping factor for a given job, with or without readout error mitigation applied, is 
 def damping_from_job(job,readout_mitigate=True,readout_calibration_job=[]):
-	from energy_evaluation import read_from_tags, ising_energy_from_job
+	from energy_evaluation import ising_energy_from_job
 	E_exact = read_from_tags('E',job.tags())
 	E_meas, dE_meas = ising_energy_from_job(job,readout_mitigate,readout_calibration_job)
 	print('E_meas = '+str(E_meas))
@@ -126,9 +127,190 @@ def damping_from_job(job,readout_mitigate=True,readout_calibration_job=[]):
 
 
 
+def plot_figs(backend,n=20,hx=1.5,hz=0.1,l_all=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,20,25,30,35,40,45,50],readout_mitigate=True,plot_ZNE=False,load_from_saved=False,threshold=0.1,plot_ZNE_calib=False,plot_from_pert=False):
+	import matplotlib.pyplot as plt
+	from matplotlib import container
+	from matplotlib import colors
+	import pickle
+	
+	## first, retrieve the data:
+	if readout_mitigate:
+		filename = backend.name()+'_n'+str(n)+".p"
+	else:
+		filename = backend.name()+'_n'+str(n)+"_no_readout_mitigation.p"
+	
+	if load_from_saved:
+		damping, d_damping, rel_error, d_rel_error = pickle.load( open( filename, "rb" ) )
+	else:
+		damping = {}
+		d_damping = {}
+		rel_error = {}
+		d_rel_error = {}
+		methods = ['raw','from pert','from small $l$',r'$\theta = 0$']
+		for method in methods:
+			damping[method] = np.empty(len(l_all))
+			damping[method][:] = np.nan
+			d_damping[method] = np.empty(len(l_all))
+			d_damping[method][:] = np.nan
+		methods_ZNE = ['ZNE',r'$\theta = 0$ + ZNE first',r'$\theta = 0$ + ZNE last']
+		rel_error = {}
+		d_rel_error = {}
+		for method in methods + methods_ZNE:
+			rel_error[method] = np.empty(len(l_all))
+			rel_error[method][:] = np.nan
+			d_rel_error[method] = np.empty(len(l_all))
+			d_rel_error[method][:] = np.nan
+		
+		
+		fit_shallow = small_l_fit(backend,n,hx,hz,max_l=15,readout_mitigate=readout_mitigate)
+		
+		for _ in range(len(l_all)):
+			l = l_all[_]
+			print('starting l = '+str(l))
+			if l > 0:
+				limit = 3
+			else:
+				limit = 1
+			jobs = backend.jobs(limit=limit,job_tags=['n = '+str(n),'l = '+str(l),'hx = '+str(hx),'hz = '+str(hz)],job_tags_operator='AND')
+			jobs_calib = backend.jobs(limit=limit,job_tags=['zero_theta_calibration','n = '+str(n),'l = '+str(l)],job_tags_operator='AND')
+			for job in jobs:
+				if read_from_tags('noise_scale',job.tags()) == 1.0:
+					break
+			for job_calib in jobs_calib:
+				if read_from_tags('noise_scale',job_calib.tags()) == 1.0:
+					break
+			damping['raw'][_], d_damping['raw'][_] = damping_from_job(job,readout_mitigate)
+			damping['from pert'][_], d_damping['from pert'][_] = damping_est_pert(job,readout_mitigate,plot=plot_from_pert,damping1_5=damping['raw'][_],d_damping1_5=d_damping['raw'][_])
+			damping['from small $l$'][_], d_damping['from small $l$'] = pred_from_fit(l,fit_shallow)
+			damping[r'$\theta = 0$'][_], d_damping[r'$\theta = 0$'][_] = damping_from_zero_theta_energy(job_calib,hx,hz,readout_mitigate)
+			if l > 0:
+				rel_error['ZNE'][_], d_rel_error['ZNE'][_] = ZNE(jobs,readout_mitigate=readout_mitigate,plot=plot_ZNE)
+				rel_error[r'$\theta = 0$ + ZNE last'][_], d_rel_error[r'$\theta = 0$ + ZNE last'][_] = damping_zero_theta_ZNE(jobs,jobs_calib,order='extrapolate_last',readout_mitigate=readout_mitigate,plot=plot_ZNE_calib)
+				rel_error[r'$\theta = 0$ + ZNE first'][_], d_rel_error[r'$\theta = 0$ + ZNE first'][_] = damping_zero_theta_ZNE(jobs,jobs_calib,order='extrapolate_first',readout_mitigate=readout_mitigate,plot=plot_ZNE_calib)
+				for method in rel_error:
+					rel_error[method][_] -= 1
+		for method in damping:
+			if (method != 'raw' and method != 'ZNE'):
+				rel_error[method] = damping['raw']/damping[method] - 1
+				d_rel_error[method] = np.sqrt( (d_damping['raw']/damping[method])**2 + (damping['raw']*d_damping[method]/damping[method]**2))
+			elif method == 'raw':
+				rel_error[method] = damping[method] - 1
+				d_rel_error[method] = d_damping[method]
+		
+		pickle.dump( (damping, d_damping, rel_error, d_rel_error), open( filename, "wb" ) )
+	
+	
+	## now plot
+	markers = ['o','v','^','<','>','s','P','*','+','x','D']
+	marker_i = 0
+	
+	### damping:
+	
+	fig, ax = plt.subplots()
+	for method in damping:
+		if method == 'raw':
+			plt.errorbar(l_all,damping[method],d_damping[method],label='true damping factor',linewidth=3,capsize=4,fmt=markers[marker_i])
+		else:
+			plt.errorbar(l_all,damping[method],d_damping[method],label='predicted, '+method,linewidth=3,capsize=4,fmt=markers[marker_i]+'-')
+		marker_i += 1
+	plt.xlabel('number of ansatz layers',fontsize = 20)
+	plt.ylabel('actual or predicted damping factor',fontsize = 18)
+	# removing error bars from legend using https://swdg.io/2015/errorbar-legends/
+	handles, labels = ax.get_legend_handles_labels()
+
+	new_handles = []
+
+	for h in handles:
+		#only need to edit the errorbar legend entries
+		if isinstance(h, container.ErrorbarContainer):
+			new_handles.append(h[0])
+		else:
+			new_handles.append(h)
+
+	ax.legend(new_handles, labels,loc='best',prop={'size': 11})
+	plt.ylim((1e-2,1))
+	ax = plt.gca()
+	ax.tick_params(axis='both', which='major', labelsize=15)
+	ax.tick_params(axis='both', which='minor', labelsize=15)
+	plt.title(backend.name(),fontsize=20)
+	plt.yscale('log')
+	
+	fig.tight_layout()
+	
+	
+	### relative error:
+	marker_i = 0
+	fig, ax = plt.subplots()
+	for method in rel_error:
+		plt.errorbar(l_all,rel_error[method],d_rel_error[method],label=method,linewidth=3,capsize=4,fmt=markers[marker_i]+'-')
+		marker_i += 1
+	plt.xlabel('number of ansatz layers',fontsize = 20)
+	plt.ylabel('relative error',fontsize = 18)
+	
+	# removing error bars from legend using https://swdg.io/2015/errorbar-legends/
+	handles, labels = ax.get_legend_handles_labels()
+
+	new_handles = []
+
+	for h in handles:
+		#only need to edit the errorbar legend entries
+		if isinstance(h, container.ErrorbarContainer):
+			new_handles.append(h[0])
+		else:
+			new_handles.append(h)
+
+	ax.legend(new_handles, labels,loc='best',prop={'size': 11})
+		
+	#plt.legend(loc='best',prop={'size': 11})
+	plt.plot([min(l_all),max(l_all)],[threshold,threshold],'k--',linewidth=2)
+	plt.plot([min(l_all),max(l_all)],[-threshold,-threshold],'k--',linewidth=2)
+	plt.ylim((-1,3))
+	ax = plt.gca()
+	ax.tick_params(axis='both', which='major', labelsize=15)
+	ax.tick_params(axis='both', which='minor', labelsize=15)
+	plt.title(backend.name(),fontsize=20)
+	
+	fig.tight_layout()
+	
+	cmap = colors.ListedColormap(np.array([[255,255,204],[161,218,180],[65,182,196],[34,94,168]])/255)
+	scores = {}
+	for method in rel_error:
+		scores[method] = rel_error_score(rel_error[method],d_rel_error[method],threshold)
+	
+	fig, ax = plt.subplots()
+	im = ax.imshow(list(scores.values()),cmap=cmap)
+	# Loop over data dimensions and create text annotations.
+	for i in range(len(scores)):
+		for j in range(len(l_all)):
+			if not np.isnan(list(scores.values())[i][j]):
+				text = ax.text(j, i, list(scores.values())[i][j], ha="center", va="center", color="k")
+	# We want to show all ticks...
+	ax.set_xticks(np.arange(len(l_all)))
+	ax.set_yticks(np.arange(len(scores)))
+	# ... and label them with the respective list entries
+	ax.set_xticklabels(l_all)
+	ax.set_yticklabels(list(scores.keys()))
+
+	plt.xlabel('number of ansatz layers',fontsize = 18)
+	#plt.ylabel('mitigation method',fontsize = 15)
+	
+	plt.title(str(n)+' qubits, '+backend.name(),fontsize=15)
+	
+	
+	
+	ax.tick_params(axis='y', which='major', labelsize=12)
+	ax.tick_params(axis='y', which='minor', labelsize=12)
+	ax.tick_params(axis='x', which='major', labelsize=11)
+	ax.tick_params(axis='x', which='minor', labelsize=11)
+	
+	fig.tight_layout()
+	
+	plt.show()
+		
+
+
 # From the perturbative regime:
-def damping_est_pert(job,readout_mitigate=True,calibration_job=[]):
-	from energy_evaluation import read_from_tags
+def damping_est_pert(job,readout_mitigate=True,calibration_job=[],noise_scale=1,plot=False,damping1_5=0,d_damping1_5=0):
 	backend = job.backend()
 	tags = job.tags()
 	n = read_from_tags('n',tags)
@@ -138,38 +320,191 @@ def damping_est_pert(job,readout_mitigate=True,calibration_job=[]):
 	
 	hx_pert = [0.1,0.2,0.3,0.4,0.5]
 	damping_all = []
+	d_damping_all = []
 	for hx in hx_pert:
-		desired_tags = ['Ising','l = '+str(l),'hx = '+str(hx),'n = '+str(n),'hz = '+str(hz)]
+		desired_tags = ['Ising','l = '+str(l),'hx = '+str(hx),'n = '+str(n),'hz = '+str(hz),'noise_scale = '+str(noise_scale)]
 		if symm:
 			desired_tags.append('symm')
 		job_pert = backend.jobs(limit=1,job_tags=desired_tags,job_tags_operator='AND')[0]
 		damping_i, d_damping_i = damping_from_job(job_pert,readout_mitigate,calibration_job)
 		damping_all.append(damping_i)
-		
+		d_damping_all.append(d_damping_i)
+	
 	damping = np.mean(damping_all)
 	d_damping = np.std(damping_all)/np.sqrt(len(hx_pert))
 	
+	if plot:
+		import matplotlib.pyplot as plt
+		hx = hx_pert + [1.5]
+		damping_all.append(damping1_5)
+		d_damping_all.append(d_damping1_5)
+		plt.errorbar(hx,damping_all,d_damping_all,fmt='.',capsize=4,label='observed damping factors')
+		plt.plot([min(hx),max(hx)],[damping,damping],'k')
+		plt.plot([min(hx),max(hx)],[damping+d_damping,damping+d_damping],'k--')
+		plt.plot([min(hx),max(hx)],[damping-d_damping,damping-d_damping],'k--')
+		plt.legend(loc='best',prop={'size':15})
+		plt.xlabel('$h_x$', fontsize=20)
+		plt.ylabel('damping factor',fontsize=20)
+		ax = plt.gca()
+		ax.tick_params(axis='both', which='major', labelsize=15)
+		ax.tick_params(axis='both', which='minor', labelsize=15)
+		if l != 1:
+			plt.title(backend.name()+', '+str(l)+' ansatz layers',fontsize=20)
+		else:
+			plt.title(backend.name()+', '+str(l)+' ansatz layer',fontsize=20)
+		plt.tight_layout()
+		plt.show()
 	return damping, d_damping
 	
+
+
+# ZNE:
+	
+def ZNE(jobs,readout_mitigate=True,plot=True):
+	import matplotlib.pyplot as plt
+	from matplotlib import container
+	scales = [read_from_tags('noise_scale',j.tags()) for j in jobs]
+	dampings = []
+	d_dampings = []
+	for job in jobs:
+		damping, d_damping = damping_from_job(job,readout_mitigate=readout_mitigate)
+		dampings.append(damping)
+		d_dampings.append(d_damping)
+	
+	from scipy.optimize import curve_fit
+	try:
+		fit = curve_fit(exp_fit,scales,dampings,p0=[1,0.5],sigma=d_dampings,absolute_sigma=True)
+		failed = False
+	except:
+		print('error: fit failed')
+		failed = True
+	if plot:
+		fig, ax = plt.subplots()
+		print('scales = '+str(scales))
+		print('dampings = '+str(dampings))
+		plt.errorbar(scales,dampings,d_dampings,label='measured energy/exact energy',linewidth=3,capsize=4)
+		if not failed:
+			plt.plot(np.linspace(0,max(scales),100),exp_fit(np.linspace(0,max(scales),100),fit[0][0], fit[0][1]),label='exponential fit')
+		plt.xlabel('noise scale',fontsize = 18)
+		plt.ylabel('energy/exact energy',fontsize = 18)
+		plt.xlim([0,max(scales)])
+		dampings = np.array(dampings)
+		d_dampings = np.array(d_dampings)
+		plt.ylim([min(dampings-d_dampings),max(max(dampings+d_dampings), exp_fit(0,fit[0][0], fit[0][1]), 1)])
+		plt.yscale('log')
+		ax.tick_params(axis='both', which='major', labelsize=15)
+		ax.tick_params(axis='both', which='minor', labelsize=15)
+		
+		# removing error bars from legend using https://swdg.io/2015/errorbar-legends/
+		handles, labels = ax.get_legend_handles_labels()
+
+		new_handles = []
+
+		for h in handles:
+			#only need to edit the errorbar legend entries
+			if isinstance(h, container.ErrorbarContainer):
+				new_handles.append(h[0])
+			else:
+				new_handles.append(h)
+
+		ax.legend(new_handles, labels,loc='best',prop={'size': 11})
+		fig.tight_layout()
+		plt.show()
+	if failed:
+		return float('nan'), float('nan')
+	else:
+		return pred_from_fit(0,fit)
 	
 	
+def ZNE_zero_theta(jobs,hx,hz,readout_mitigate=True,plot=True):
+	import matplotlib.pyplot as plt
+	scales = [read_from_tags('noise_scale',j.tags()) for j in jobs]
+	dampings = []
+	d_dampings = []
+	for job in jobs:
+		damping, d_damping = damping_from_zero_theta_energy(job,hx,hz,readout_mitigate=readout_mitigate)
+		dampings.append(damping)
+		d_dampings.append(d_damping)
 	
+	from scipy.optimize import curve_fit
+	try:
+		fit = curve_fit(exp_fit,scales,dampings,p0=[1,0.5],sigma=d_dampings,absolute_sigma=True)
+	except:
+		print('error: fit failed')
+		return float('nan'), float('nan')
+	if plot:	
+		plt.errorbar(scales,dampings,d_dampings,label='data')
+		plt.plot(np.linspace(0,max(scales),100),exp_fit(np.linspace(0,max(scales),100),fit[0][0], fit[0][1]),label='fit')
+		plt.legend(loc='best')
+		plt.xlabel('noise scale')
+		plt.ylabel('damping factor')
+		plt.xlim([0,max(scales)])
+		plt.show()
 	
+	return pred_from_fit(0,fit)
 	
+
+def damping_zero_theta_ZNE(jobs_ZNE,jobs_ZNE_zero_theta,order='extrapolate_last',readout_mitigate=True,plot=True):
+	hx = read_from_tags('hx',jobs_ZNE[0].tags())
+	hz = read_from_tags('hz',jobs_ZNE[0].tags())
+	
+	if order == 'extrapolate_first':
+		damping, d_damping = ZNE(jobs_ZNE,readout_mitigate=readout_mitigate,plot=plot)
+		damping_zero_theta, d_damping_zero_theta = ZNE_zero_theta(jobs_ZNE_zero_theta,hx,hz,readout_mitigate=readout_mitigate,plot=plot)
+		return damping/damping_zero_theta, np.sqrt( (d_damping/damping_zero_theta)**2 + (damping*d_damping_zero_theta/damping_zero_theta**2)**2)
+	elif order == 'extrapolate_last':
+		dampings = []
+		d_dampings = []
+		scales = []
+		for i in range(len(jobs_ZNE)):
+			job = jobs_ZNE[i]
+			job_calib = jobs_ZNE_zero_theta[i]
+			scales.append(read_from_tags('noise_scale',job.tags()))
+			damping, d_damping = damping_from_job(job,readout_mitigate=readout_mitigate)
+			damping_calib, d_damping_calib = damping_from_zero_theta_energy(job_calib,hx,hz,readout_mitigate=readout_mitigate)
+			dampings.append(damping/damping_calib)
+			d_dampings.append(np.sqrt( (d_damping/damping_calib)**2 + (damping*d_damping_calib/damping_calib**2)**2))
+			print('scale = '+str(scales[-1]))
+			print('damping_i = '+str(dampings[-1]))
+			print('d_damping_i = '+str(d_dampings[-1]))
+		
+		from scipy.optimize import curve_fit
+		try:
+			fit = curve_fit(exp_fit,scales,dampings,p0=[1,0.5],sigma=d_dampings,absolute_sigma=True)
+		except:
+			print('error: fit failed')
+			return float('nan'), float('nan')
+		if plot:	
+			import matplotlib.pyplot as plt
+			plt.errorbar(scales,dampings,d_dampings,label='data')
+			plt.plot(np.linspace(0,max(scales),100),exp_fit(np.linspace(0,max(scales),100),fit[0][0], fit[0][1]),label='fit')
+			plt.legend(loc='best')
+			plt.xlabel('noise scale')
+			plt.ylabel('damping factor')
+			plt.xlim([0,max(scales)])
+			plt.show()
+		
+		return pred_from_fit(0,fit)
+	
+
+
 # from small l:
 
 def exp_fit(l,A,b):
 	return A*np.exp(-b*l)
 
-def small_l_fit(backend,n,hx,hz,max_l=15,readout_mitigate=True):
+def small_l_fit(backend,n,hx,hz,max_l=15,readout_mitigate=True,noise_scale=1):
 	from scipy.optimize import curve_fit
 	l_all = range(0,max_l+1)
 	damping_all = []
 	d_damping_all = []
 	for l in l_all:
 		desired_tags = ['Ising','l = '+str(l),'hx = '+str(hx),'n = '+str(n),'hz = '+str(hz)]
-		job = backend.jobs(limit=1,job_tags=desired_tags,job_tags_operator='AND')[0]
-		damping_i, d_damping_i = damping_from_job(job_pert,readout_mitigate)
+		jobs = backend.jobs(limit=3,job_tags=desired_tags,job_tags_operator='AND')
+		for job in jobs:
+			if read_from_tags('noise_scale',job.tags()) == noise_scale:
+				break
+		damping_i, d_damping_i = damping_from_job(job,readout_mitigate)
 		damping_all.append(damping_i)
 		d_damping_all.append(d_damping_i)
 		
@@ -181,7 +516,7 @@ def pred_from_fit(l,fit,size=100000):
 	rng = np.random.default_rng()
 	params = rng.multivariate_normal(fit[0],fit[1],size=size)
 	est = exp_fit(l,params[:,0],params[:,1])
-	return [np.mean(est), np.std(est)]
+	return np.mean(est), np.std(est)
 
 
 
@@ -208,182 +543,16 @@ def Minv_uncorrelated_uncertainty(e0_0_pop, e1_0_pop, e0_1_pop, e1_1_pop, shots)
 	
 	return np.mean(Minv,axis=0), np.std(Minv,axis=0)
 
-def damping_from_zero_theta_fidelity(zero_calib_job,readout_mitigate=True,readout_calibration_job=None):
-	# zero_calib_job should be the \theta=0 calibration job.
-	from energy_evaluation import read_from_tags, load_qubit_map
-	
-	
-	result = zero_calib_job.result()
-	shots = result.to_dict().get('results')[0].get('shots')
-	counts = result.get_counts()
-	configs_all = read_from_tags('configs',zero_calib_job.tags())
-	num_configs = len(configs_all[0])
-	n = read_from_tags('n',zero_calib_job.tags())
-	qubit_map = load_qubit_map(zero_calib_job.backend().name(),n)
-	properties = zero_calib_job.properties()
-	
-	
-	if readout_calibration_job == None:
-		includes_one_qubit = True
-	
-	# readout mitigation:
-	if readout_mitigate:
-		if readout_calibration_job != None:
-			qubits_measured_all = list(read_from_tags('qubits_measured_all',readout_calibration_job.tags()))
-			qubits_measured_1 = [q for q in qubits_measured_all if len(q) == 1]
-			qubits_measured_2 = [q for q in qubits_measured_all if len(q) == 2]
-			includes_one_qubit = len(qubits_measured_1) > 0
-			e_1qubit, Minv, de_1qubit, dMinv = analyze_readout_calibration_advanced(readout_calibration_job)
-		elif readout_calibration_job == None:
-			qubits_measured_1 = [ frozenset([i]) for i in range(n)]
-			qubits_measured_2 = [ frozenset([i,(i+1)%n]) for i in range(n)]
-			e_1qubit = np.array([ [properties.qubit_property(q,'prob_meas1_prep0')[0], properties.qubit_property(q,'prob_meas0_prep1')[0]] for q in qubit_map])
-			de_1qubit = np.sqrt(e_1qubit*(1-e_1qubit)/5000)
-			Minv = []
-			dMinv = []
-			for i in range(n):
-				[e0_0, e1_0] = e_1qubit[i]
-				[e0_1, e1_1] = e_1qubit[(i+1)%n]
-				M = [[ (1 - e0_0)*(1-e0_1), e1_0*(1-e0_1), e1_1*(1-e0_0), e1_0*e1_1], \
-					 [e0_0*(1-e0_1), (1-e1_0)*(1-e0_1), e0_0*e1_1, e1_1*(1-e1_0)], \
-					 [e0_1*(1-e0_0), e1_0*e0_1, (1-e0_0)*(1-e1_1), (1-e1_1)*e1_0], \
-					 [e0_1*e0_0, (1-e1_0)*e0_1, e0_0*(1-e1_1), (1-e1_1)*(1-e1_0)]]
-				Minv.append( np.linalg.inv(M))
-				Minv_mean, dMinv_i = Minv_uncorrelated_uncertainty(e0_0, e1_0, e0_1, e1_1, 5000)
-				dMinv.append(dMinv_i)
-		
-		# ZZ0 term:
-		C_zz0 = []
-		dC_zz0 = []
-		for which_config in range(num_configs):
-			config = configs_all[0][which_config]
-			if config >= 0:
-				qubits_measured = (np.array([0,1]) + config)%n
-			elif config < 0:
-				qubits_measured = (-np.array([0,1]) + config + 1)%n
-			which_calib_term = qubits_measured_2.index(frozenset(qubits_measured))
-			reversed = not (qubits_measured[0] == list(qubits_measured_2[which_calib_term])[0])
-			if reversed:
-				counts_vector = [counts[which_config].get(bitstr,0) for bitstr in ['00','01','10','11'] ]
-			else:
-				counts_vector = [counts[which_config].get(bitstr,0) for bitstr in ['00','10','01','11'] ]
-			counts_vector = np.array(counts_vector)
-			d_counts_vector = np.sqrt(counts_vector * (shots - counts_vector)/shots)
-			counts_mitigated = Minv[which_calib_term]@counts_vector
-			d_counts_mitigated = np.sqrt( (dMinv[which_calib_term]**2)@(counts_vector**2) + Minv[which_calib_term]**2 @ d_counts_vector**2 )
-			C_zz0.append( (counts_mitigated[0]/shots - 1/4)*4/3 )
-			dC_zz0.append( d_counts_mitigated[0]/shots*4/3 )
-			
-			
-		# ZZ1 term:
-		C_zz1 = []
-		dC_zz1 = []
-		for which_config in range(num_configs):
-			config = configs_all[1][which_config]
-			if config >= 0:
-				qubits_measured = (np.array([1,2]) + config)%n
-			elif config < 0:
-				qubits_measured = (-np.array([1,2]) + config + 1)%n
-			which_calib_term = qubits_measured_2.index(frozenset(qubits_measured))
-			reversed = not (qubits_measured[0] == list(qubits_measured_2[which_calib_term])[0])
-			if reversed:
-				counts_vector = [counts[num_configs+which_config].get(bitstr,0) for bitstr in ['00','01','10','11'] ]
-			else:
-				counts_vector = [counts[num_configs+which_config].get(bitstr,0) for bitstr in ['00','10','01','11'] ]
-			counts_vector = np.array(counts_vector)
-			d_counts_vector = np.sqrt(counts_vector * (shots - counts_vector)/shots)
-			counts_mitigated = Minv[which_calib_term]@counts_vector
-			d_counts_mitigated = np.sqrt( (dMinv[which_calib_term]**2)@(counts_vector**2) + Minv[which_calib_term]**2 @ d_counts_vector**2 )
-			C_zz1.append( (counts_mitigated[0]/shots - 1/4)*4/3 )
-			dC_zz1.append( d_counts_mitigated[0]/shots*4/3 )
-			
-		# Z0 term:
-		C_z0 = []
-		dC_z0 = []
-		for which_config in range(num_configs):
-			config = configs_all[4][which_config]
-			if config >= 0:
-				qubit_measured = config
-			else:
-				qubit_measured = (config+1)%n
-			if includes_one_qubit:
-				[e0,e1] = e_1qubit[ qubits_measured_1.index( frozenset([qubit_measured]))]
-				[de0,de1] = de_1qubit[ qubits_measured_1.index( frozenset([qubit_measured]))]
-			else:
-				e0 = properties.qubit_property(qubit_map[qubit_measured],'prob_meas1_prep0')[0]
-				e1 = properties.qubit_property(qubit_map[qubit_measured],'prob_meas0_prep1')[0]
-				de0 = np.sqrt(e0*(1-e0)/5000)
-				de1 = np.sqrt(e1*(1-e1)/5000)
-			f0_measured = counts[4*num_configs+which_config].get('0',0)/shots
-			f0 = (f0_measured - e1)/(1-e0-e1)
-			d_f0_measured = np.sqrt(f0_measured*(1-f0_measured)/shots)
-			df0 = np.sqrt( (d_f0_measured/(1-e0-e1))**2 + ( -1/(1-e0-e1) + (f0_measured - e1)/(1-e0-e1)**2)**2 * de1**2 + ((f0_measured - e1)/(1-e0-e1)**2 * de0)**2 )
-			C_z0.append((f0-1/2)*2)
-			dC_z0.append(2*df0)
-		
-		# Z1 term:
-		C_z1 = []
-		dC_z1 = []
-		for which_config in range(num_configs):
-			config = configs_all[5][which_config]
-			if config >= 0:
-				qubit_measured = (1+config)%n
-			else:
-				qubit_measured = (config)%n
-			if includes_one_qubit:
-				[e0,e1] = e_1qubit[ qubits_measured_1.index( frozenset([qubit_measured]))]
-				[de0,de1] = de_1qubit[ qubits_measured_1.index( frozenset([qubit_measured]))]
-			else:
-				e0 = properties.qubit_property(qubit_map[qubit_measured],'prob_meas1_prep0')[0]
-				e1 = properties.qubit_property(qubit_map[qubit_measured],'prob_meas0_prep1')[0]
-				de0 = np.sqrt(e0*(1-e0)/5000)
-				de1 = np.sqrt(e1*(1-e1)/5000)
-			f0_measured = counts[5*num_configs+which_config].get('0',0)/shots
-			f0 = (f0_measured - e1)/(1-e0-e1)
-			d_f0_measured = np.sqrt(f0_measured*(1-f0_measured)/shots)
-			df0 = np.sqrt( (d_f0_measured/(1-e0-e1))**2 + ( -1/(1-e0-e1) + (f0_measured - e1)/(1-e0-e1)**2)**2 * de1**2 + ((f0_measured - e1)/(1-e0-e1)**2 * de0)**2 )
-			C_z1.append((f0-1/2)*2)
-			dC_z1.append(2*df0)
-	
-	else:
-		C_zz0 = [ ( counts[i].get('00',0)/shots - 1/4)*4/3 for i in range(num_configs) ]
-		C_zz1 = [ ( counts[i].get('00',0)/shots - 1/4)*4/3 for i in range(num_configs,2*num_configs)]
-		C_z0 = [ ( counts[i].get('0',0)/shots - 1/2)*2 for i in range(4*num_configs,5*num_configs) ]
-		C_z1 = [ ( counts[i].get('0',0)/shots - 1/2)*2 for i in range(5*num_configs,6*num_configs) ]
-
-		
-		dC_zz0 = [ 4/3*np.sqrt( counts[i].get('00',0)/shots * (1 - counts[i].get('00',0)/shots) / shots ) for i in range(num_configs) ]
-		dC_zz1 = [ 4/3*np.sqrt( counts[i].get('00',0)/shots * (1 - counts[i].get('00',0)/shots) / shots ) for i in range(num_configs,2*num_configs) ]
-		dC_z0 = [ 2*np.sqrt( counts[i].get('0',0)/shots * (1 - counts[i].get('0',0)/shots) / shots ) for i in range(4*num_configs,5*num_configs) ]
-		dC_z1 = [ 2*np.sqrt( counts[i].get('0',0)/shots * (1 - counts[i].get('0',0)/shots) / shots ) for i in range(5*num_configs,6*num_configs) ]
-	
-	compensation_factors_list = [C_zz0, C_zz1, C_z0, C_z1, C_z0, C_z1]
-	d_compensation_factors_list = [dC_zz0, dC_zz1, dC_z0, dC_z1, dC_z0, dC_z1]
-	
-	compensation_factors = C_zz0 + C_zz1 + C_z0 + C_z1
-	d_compensation_factors = dC_zz0 + dC_zz1 + dC_z0 + dC_z1
-	
-	print('compensation factors = '+str(compensation_factors))
-	print('d_compensation factors = '+str(d_compensation_factors))
-
-	damping = np.mean(compensation_factors)
-	d_damping = np.sqrt(np.sum(np.square(d_compensation_factors)))/len(compensation_factors)
-	
-	return damping, d_damping
 
 	
 def damping_from_zero_theta_energy(zero_calib_job,hx,hz,readout_mitigate=True,readout_calibrate_job=[]):
-	from energy_evaluation import read_from_tags, ising_energy_from_job, energy_from_job
+	from energy_evaluation import ising_energy_from_job, energy_from_job
 	E_exact = -2*(1+hz)
 	coeffs = [-1 for _ in range(2)] + [-hx for _ in range(2)] + [-hz for _ in range(2)]
 	E_meas, dE_meas = energy_from_job(zero_calib_job,coeffs,readout_mitigate,readout_calibrate_job)
 	damping = E_meas/E_exact
 	d_damping = abs(dE_meas/E_exact)
 	return damping, d_damping
-
-
-
-
 
 
 # finally, we have the two methods which estimate the damping from the reported error rates
@@ -458,7 +627,7 @@ def simulate_job(job,include_noise=True,gpu=True,include_gate_errors=True,includ
 		for i in range(len(paulis)):
 			pauli = paulis[i]
 			for config in configs[i]:
-				qc_i = ansatz_circuit(theta_i,pauli)
+				qc_i = ansatz_circuit(theta_i,pauli,rand_compile=False,noise_scale=1)
 				qc_i = cycle_QuantumCircuit(qc_i,config)
 				qc.append(qc_i)
 	if include_noise:
@@ -482,7 +651,6 @@ def simulate_job(job,include_noise=True,gpu=True,include_gate_errors=True,includ
 
 def damping_from_aer_simulation(job,include_noise=True,gpu=True,include_gate_errors=True,include_readout_errors=True,density_matrix=True):
 	# readout error is included in the aer simulation, so this should be compared to the measured dampings without readout error mitigation
-	from energy_evaluation import read_from_tags
 	E_exact = read_from_tags('E',job.tags())
 	E_pred, dE_pred = simulate_job(job,include_noise,gpu,include_gate_errors,include_readout_errors,density_matrix)
 	damping = E_pred/E_exact
@@ -598,12 +766,13 @@ def damping_mult_fidelities(job):
 	return damping
 	
 	
+################# The following is not finished: ##########################
 
 
-##### for calibrating readout error mitigation:
+
+## more careful readout mitigation:
 
 def qubits_measured_from_job(job):
-	from energy_evaluation import read_from_tags
 	tags = job.tags()
 	whichPauli_all = read_from_tags('whichPauli',tags)
 	configs_all = read_from_tags('configs',tags)
@@ -699,7 +868,6 @@ def analyze_readout_calibration(calibration_job):
 def analyze_readout_calibration_advanced(calibration_job):
 
 
-	from energy_evaluation import read_from_tags
 	result = calibration_job.result()
 	shots = result.results[0].shots
 	counts = result.get_counts()
@@ -773,9 +941,8 @@ def plot_from_machine_layers(n=20,hx=1.5,hz=0.1,start_date = datetime(year=2021,
 	# n=20,hx=1.5,hz=0.1,start_date = datetime(year=2021,month=4,day=13,hour=0,minute=2,second=30),end_date = datetime(year=2021,month=4,day=13,hour=23,minute=0),backend_name='ibmq_toronto'
 
 	import matplotlib.pyplot as plt
-	from energy_evaluation import read_from_tags
 	
-	save_dir = '/your_directory/damping_factors/'+backend_name+'/n'+str(n)+'/'
+	save_dir = '/your_directory/results/damping_factors/'+backend_name+'/n'+str(n)+'/'
 	
 	
 	damping_readout = []
@@ -1111,4 +1278,190 @@ def plot_from_machine_layers(n=20,hx=1.5,hz=0.1,start_date = datetime(year=2021,
 	ax.tick_params(axis='x', which='minor', labelsize=11)
 	
 	plt.show()
+
+
+################## randomized measurement of Tr[\rho^2]
+
+def matrix_to_euler_angles(u):
+	## u is an arbitrary 2x2 unitary matrix. Returns the Euler angles that can be fed into a UGate (https://qiskit.org/documentation/stubs/qiskit.circuit.library.UGate.html) to reproduce the input matrix up to a global phase.
+	
+	# first divide out phase of 00 element
+	if abs(u[0,0]) > 1e-5: # if 00 element is nonzero
+		phase = u[0,0]/abs(u[0,0])
+		u = u/phase
+	#now extract the parameters
+	theta = 2*np.arccos(u[0,0].real)
+	if abs(theta) > 1e-5: # if off-diagonal elements are nonzero
+		phi = np.angle(u[1,0])
+		lam = np.angle(-u[0,1])
+	else:
+		phi = np.angle(u[1,1])
+		lam = 0
+		
+	return theta, phi, lam
+	
+def Harr_random_Euler_angles():
+	from scipy.stats import unitary_group
+	u = unitary_group.rvs(2)
+	return matrix_to_euler_angles(u)
+	
+	
+	
+def ansatz_circuit_with_random_u(theta,whichPauli):
+	from energy_evaluation import ansatz_circuit
+	from scipy.stats import unitary_group
+	
+	h = np.array([[1,1],[1,-1]])/np.sqrt(2)
+	def ry(th):
+		return np.array( [[np.cos(th/2), -np.sin(th/2)],[np.sin(th/2),np.cos(th/2)]])
+	sdg = np.array([[1,0],[0,-1j]])
+	
+	qc = ansatz_circuit(theta,whichPauli,False,False,rand_compile=False)
+	n = len(whichPauli)
+	l = len(theta)//n - 1
+	qubitsMeasured = [i for i in range(n) if whichPauli[i] > 0]
+	num_qubits_measured = len(qubitsMeasured)
+	for i in range(num_qubits_measured):
+		q = qubitsMeasured[i]
+		if whichPauli[q] == 1:
+			u = unitary_group.rvs(2)@h@ry(theta[n*l + q])
+		elif whichPauli[q] == 2:
+			u = unitary_group.rvs(2)@h@sdg@ry(theta[n*l + q])
+		elif whichPauli[q] == 3:
+			u = unitary_group.rvs(2)@ry(theta[n*l + q])
+		
+		th, phi, lam = matrix_to_euler_angles(u)
+		qc.u(th,phi,lam,q)
+		qc.measure(q,i)
+	return qc
+	
+
+
+	
+def submit_circuits_with_random_u(theta,whichPauli_all,backend_name,num_random_u=10,tags=[],shots=8192,configs_all_terms=[],include_original_circuit=True):
+	from qiskit import IBMQ, execute
+	from energy_evaluation import ansatz_circuit, cycle_QuantumCircuit, load_qubit_map, pick_config
+	# theta can be a list or numpy array of multiple points in parameter space.
+	# if configs_all_terms is not specified, picks automatically.
+	global account
+	if 'account' not in globals():
+		account = IBMQ.load_account()
+	backend = account.get_backend(backend_name)
+	
+	multi_theta = len(np.shape(theta)) > 1
+	if not multi_theta:
+		theta = [theta]
+	
+	n = len(whichPauli_all[0]) # number of qubits
+	l = len(theta[0])//n - 1  # the number of ansatz layers; depends on the ansatz
+	
+	
+	## pick configs if not supplied
+	if len(configs_all_terms) == 0:
+		# load error rates
+		faulty = True
+		while faulty:
+			qubits = load_qubit_map(backend_name,n)
+			properties = backend.properties(refresh=True)
+			e_cx = [properties.gate_error('cx',[qubits[i],qubits[(i+1)%n]]) for i in range(n)]
+			e_sx = [properties.gate_error('sx',q) for q in qubits]
+			em = [properties.readout_error(q) for q in qubits]
+			faulty = max(e_cx) >= 1 or max(e_sx) >= 1 or max(em) >= 0.5
+			if faulty:
+				print('faulty qubits or gates. Retrying in 2 minutes')
+				time.sleep(120)
+		# done loading error rates
+		configs_all_terms = [pick_config(l,whichPauli,e_cx,e_sx,em,minNumConfigs=4,method='largest_slopes',cutoff=0) for whichPauli in whichPauli_all]
+	# done picking configs
+		
+
+		
+	qc_all = []
+	for th_i in theta:
+		for term in range(len(whichPauli_all)):
+			whichPauli = whichPauli_all[term]
+			configs_term = configs_all_terms[term]
+			qc = ansatz_circuit(th_i,whichPauli,True,rand_compile=False)
+			for config in configs_term:
+				if include_original_circuit:
+					qc_all.append( cycle_QuantumCircuit(qc,config))
+				for _ in range(num_random_u):
+					qc_u = ansatz_circuit_with_random_u(th_i,whichPauli)
+					qc_all.append( cycle_QuantumCircuit(qc_u,config))
+
+	
+	
+	tags += ['n = '+str(n),'l = '+str(l),'theta = '+str(theta),'configs = '+str(configs_all_terms),'whichPauli = '+str(whichPauli_all),'rand_u','num_random_u = '+str(num_random_u),'include_original_circuit = '+str(include_original_circuit)]
+	
+	for _ in range(20):
+		try:
+			job =  execute(qc_all, backend=backend, shots=shots, initial_layout=load_qubit_map(backend_name,n), job_tags=tags)
+			break
+		except:
+			print('Error submitting job. Retrying.')
+			time.sleep(60)
+			IBMQ.load_account()
+			continue
+	return job
+
+
+
+def submit_ising_symm_with_random_u(n,theta,backend_name,tags=[],shots=8192,hx=1.5,hz=0.1,E=[],configs_all_terms=[],input_condensed_theta=True,num_random_u=10,include_original_circuit=True):
+
+	from energy_evaluation import all_ising_Paulis_symm
+	
+	multi_theta = len(np.shape(theta)) > 1
+	if not multi_theta:
+		theta = [theta]
+	
+	if input_condensed_theta:
+		l = len(theta[0])//2 - 1
+		theta_full = [[ theta_i[theta_ALAy_to_symm(which_theta,n)] for which_theta in range(n*(l+1))] for theta_i in theta]
+		theta = theta_full
+	
+	return submit_circuits_with_random_u(theta,all_ising_Paulis_symm(n),backend_name,num_random_u,tags+['Ising','symm','hx = '+str(hx),'hz = '+str(hz),'E = '+str(E)],shots,configs_all_terms,include_original_circuit)
+
+
+
+def hamming(s1,s2):
+	D = 0
+	for i in range(len(s1)):
+		if s1[i] != s2[i]:
+			D += 1
+	return D
+
+
+def tr_rho2(counts_all):
+	# computes Eq. 2 from doi:10.1126/science.aau4963
+	
+	num_random_u = len(counts_all)
+	n_meas = len( list(counts_all[0].keys())[0] )
+	
+	shots = 0
+	for s in counts_all[0]:
+		shots += counts_all[0][s]
+	
+	tr = 0
+	d_tr2 = 0
+	
+	
+	for counts in counts_all:
+		for s1 in counts:
+			for s2 in counts:
+				P1 = counts[s1]/shots
+				P2 = counts[s2]/shots
+				D = hamming(s1,s2)
+				tr += 2**n_meas * (-2)**(-D) * P1 * P2
+				dP1 = np.sqrt(P1*(1-P1)/shots)
+				dP2 = np.sqrt(P2*(1-P2)/shots)
+				if s1 != s2:
+					d_tr2 += (2**n_meas * (-2)**(-D) * dP1 * P2)**2 + (2**n_meas * (-2)**(-D) * P1 * dP2)**2
+				elif s1 == s2:
+					d_tr2 += (2 * 2**n_meas * (-2)**(-D) * dP1 * P1)**2 
+				
+	tr = tr/num_random_u
+	d_dr = np.sqrt(d_tr2)/num_random_u
+				
+	return tr, d_tr
+
 

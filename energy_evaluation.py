@@ -4,12 +4,13 @@
 
 import numpy as np
 from qiskit import QuantumCircuit, IBMQ, execute
+from compiling import *
 import re
 from library import *
 global account
 import time
 
-def ansatz_circuit(theta,whichPauli,measure=True,include_last_rotations=True):
+def ansatz_circuit(theta,whichPauli,measure=True,include_last_rotations=True,rand_compile=True,noise_scale=1):
 	# Creates a Qiskit circuit of the ansatz used in our paper. whichPauli indicates which Pauli operator is measured in the end.
 	
 	n = len(whichPauli)
@@ -67,7 +68,9 @@ def ansatz_circuit(theta,whichPauli,measure=True,include_last_rotations=True):
 		
 			if measure:
 				qc.measure(qm,i)
-			
+	
+	qc = fold_and_compile(noise_scale,qc,rand_compile)
+
 	return qc
 
 
@@ -85,50 +88,50 @@ def cycle_QuantumCircuit(qc, config):
 
 
 def load_qubit_map(machine,n):
-  if machine == 'ibmq_montreal' or machine=='ibmq_toronto' or machine == 'ibmq_sydney':
-    if n == 12:
-        qubits = [1,4,7,10,12,13,14,11,8,5,3,2];
-        #qubits = [12,15,18,21,23,24,25,22,19,16,14,13]
-    elif n == 20:
-        qubits = [1,4,7,10,12,15,18,21,23,24,25,22,19,16,14,11,8,5,3,2];
-  elif  machine=='ibmq_rochester':
-      if n == 12:
-          qubits = [21,22,23,24,25,29,36,35,34,33,32,28];
-  elif machine=='ibmq_cambridge':
-      if n == 12:
-          qubits = [0,1,2,3,4,6,13,12,11,10,9,5];
-          #qubits = [7,8,9,10,11,17,23,22,21,20,19,16];
-          #qubits = [11,12,13,14,15,18,27,26,25,24,23,17];
-      elif n == 20:
-          qubits = [0,1,2,3,4,6,13,12,11,17,23,22,21,20,19,16,7,8,9,5];
-          #qubits = [0,1,2,3,4,6,13,14,15,18,27,26,25,24,23,17,11,10,9,5];
-          #qubits = [7,8,9,10,11,12,13,14,15,18,27,26,25,24,23,22,21,20,19,16];
-      elif n == 24:
-          qubits = [0,1,2,3,4,6,13,14,15,18,27,26,25,24,23,22,21,20,19,16,7,8,9,5];
-  elif machine=='ibmq_16_melbourne':
-      if n == 4:
-          qubits = [2,3,11,12]; # 4 qubits
-      elif n == 6:
-          qubits = [0,1,2,12,13,14]; # 6 qubits
-      elif n == 8:
-          qubits = [0,1,2,3,11,12,13,14]; # 8 qubits
-      elif n == 10:
-          qubits = [0,1,2,3,4,10,11,12,13,14]; # 10 qubits
-      elif n == 12:
-          qubits = [0,1,2,3,4,5,9,10,11,12,13,14]; # 12 qubits
-  elif machine == 'ibmq_manhattan':
-      if n == 12:
-          qubits = [4,5,6,7,8,12,21,20,19,18,17,11]
-      if n == 20:
-          qubits = [0,1,2,3,4,5,6,7,8,12,21,20,19,18,17,16,15,14,13,10]
-      elif n == 44:
-          qubits = [0,1,2,3,4,5,6,7,8,12,21,22,23,26,37,36,35,40,49,50,51,54,64,63,62,61,60,59,58,57,56,52,43,42,41,38,27,28,29,24,15,14,13,10]
-      elif n == 52:
-          qubits = [0,1,2,3,4,5,6,7,8,12,21,22,23,26,37,36,35,34,33,32,31,39,45,46,47,48,49,50,51,54,64,63,62,61,60,59,58,57,56,52,43,42,41,38,27,28,29,24,15,14,13,10]
-  else:
-      qubits = np.arange(n)
+	if machine == 'ibmq_montreal' or machine=='ibmq_toronto' or machine == 'ibmq_sydney' or machine == 'ibmq_mumbai' or machine == 'ibm_cairo' or machine == 'ibm_hanoi':
+		if n == 12:
+			qubits = [1,4,7,10,12,13,14,11,8,5,3,2];
+			#qubits = [12,15,18,21,23,24,25,22,19,16,14,13]
+		elif n == 20:
+			qubits = [1,4,7,10,12,15,18,21,23,24,25,22,19,16,14,11,8,5,3,2];
+	elif  machine=='ibmq_rochester':
+		if n == 12:
+			qubits = [21,22,23,24,25,29,36,35,34,33,32,28];
+	elif machine=='ibmq_cambridge':
+		if n == 12:
+			qubits = [0,1,2,3,4,6,13,12,11,10,9,5];
+			#qubits = [7,8,9,10,11,17,23,22,21,20,19,16];
+			#qubits = [11,12,13,14,15,18,27,26,25,24,23,17];
+		elif n == 20:
+			qubits = [0,1,2,3,4,6,13,12,11,17,23,22,21,20,19,16,7,8,9,5];
+			#qubits = [0,1,2,3,4,6,13,14,15,18,27,26,25,24,23,17,11,10,9,5];
+			#qubits = [7,8,9,10,11,12,13,14,15,18,27,26,25,24,23,22,21,20,19,16];
+		elif n == 24:
+			qubits = [0,1,2,3,4,6,13,14,15,18,27,26,25,24,23,22,21,20,19,16,7,8,9,5];
+	elif machine=='ibmq_16_melbourne':
+		if n == 4:
+			qubits = [2,3,11,12]; # 4 qubits
+		elif n == 6:
+			qubits = [0,1,2,12,13,14]; # 6 qubits
+		elif n == 8:
+		  qubits = [0,1,2,3,11,12,13,14]; # 8 qubits
+		elif n == 10:
+			qubits = [0,1,2,3,4,10,11,12,13,14]; # 10 qubits
+		elif n == 12:
+			qubits = [0,1,2,3,4,5,9,10,11,12,13,14]; # 12 qubits
+	elif machine == 'ibmq_manhattan':
+		if n == 12:
+			qubits = [4,5,6,7,8,12,21,20,19,18,17,11]
+		if n == 20:
+			qubits = [0,1,2,3,4,5,6,7,8,12,21,20,19,18,17,16,15,14,13,10]
+		elif n == 44:
+			qubits = [0,1,2,3,4,5,6,7,8,12,21,22,23,26,37,36,35,40,49,50,51,54,64,63,62,61,60,59,58,57,56,52,43,42,41,38,27,28,29,24,15,14,13,10]
+		elif n == 52:
+			qubits = [0,1,2,3,4,5,6,7,8,12,21,22,23,26,37,36,35,34,33,32,31,39,45,46,47,48,49,50,51,54,64,63,62,61,60,59,58,57,56,52,43,42,41,38,27,28,29,24,15,14,13,10]
+	else:
+		qubits = np.arange(n)
 
-  return qubits
+	return qubits
 
 
 def read_from_tags(varName,tags):
@@ -414,7 +417,7 @@ def ising_energy_from_job(job,readout_mitigate=True,calibration_job=[]):
 
 #### submitting jobs:
 	
-def submit_circuits(theta,whichPauli_all,backend_name,tags=[],shots=1024,configs_all_terms=[]):
+def submit_circuits(theta,whichPauli_all,backend_name,tags=[],shots=1024,configs_all_terms=[],rand_compile=True,noise_scale=1):
 	# theta can be a list or numpy array of multiple points in parameter space.
 	# if configs_all_terms is not specified, picks automatically.
 	global account
@@ -455,17 +458,17 @@ def submit_circuits(theta,whichPauli_all,backend_name,tags=[],shots=1024,configs
 		for term in range(len(whichPauli_all)):
 			whichPauli = whichPauli_all[term]
 			configs_term = configs_all_terms[term]
-			qc = ansatz_circuit(th_i,whichPauli,True)
+			qc = ansatz_circuit(th_i,whichPauli,True,True,rand_compile,noise_scale)
 			for config in configs_term:
 				qc_all.append( cycle_QuantumCircuit(qc,config))
 				
 	
 	
-	tags += ['n = '+str(n),'l = '+str(l),'theta = '+str(theta),'configs = '+str(configs_all_terms),'whichPauli = '+str(whichPauli_all)]
+	tags += ['n = '+str(n),'l = '+str(l),'theta = '+str(theta),'configs = '+str(configs_all_terms),'whichPauli = '+str(whichPauli_all),'rand_compile = '+str(rand_compile), 'noise_scale = '+str(noise_scale)]
 	
 	for _ in range(20):
 		try:
-			job =  execute(qc_all, backend=backend, shots=shots, initial_layout=load_qubit_map(backend_name,n), job_tags=tags)
+			job =  execute(qc_all, backend=backend, shots=shots, initial_layout=load_qubit_map(backend_name,n), job_tags=tags,optimization_level=0)
 			break
 		except:
 			print('Error submitting job. Retrying.')
@@ -475,11 +478,11 @@ def submit_circuits(theta,whichPauli_all,backend_name,tags=[],shots=1024,configs
 	return job
 
 
-def submit_ising(n,theta,backend_name,tags=[],shots=1024,hx=1.5,hz=0.1,E=[],configs_all_terms=[]):
-	return submit_circuits(theta,all_ising_Paulis(n),backend_name,tags=tags+['Ising','hx = '+str(hx),'hz = '+str(hz),'E = '+str(E)],shots=shots,configs_all_terms=configs_all_terms)
+def submit_ising(n,theta,backend_name,tags=[],shots=1024,hx=1.5,hz=0.1,E=[],configs_all_terms=[],rand_compile=True,noise_scale=1):
+	return submit_circuits(theta,all_ising_Paulis(n),backend_name,tags=tags+['Ising','hx = '+str(hx),'hz = '+str(hz),'E = '+str(E)],shots=shots,configs_all_terms=configs_all_terms,rand_compile=rand_compile,noise_scale=noise_scale)
 
 
-def submit_ising_symm(n,theta,backend_name,tags=[],shots=1024,hx=1.5,hz=0.1,E=[],configs_all_terms=[],input_condensed_theta=True):
+def submit_ising_symm(n,theta,backend_name,tags=[],shots=1024,hx=1.5,hz=0.1,E=[],configs_all_terms=[],input_condensed_theta=True,rand_compile=True,noise_scale=1):
 	# assumes that the ansatz has permutation symmetry imposed
 	
 	if input_condensed_theta:
@@ -487,7 +490,7 @@ def submit_ising_symm(n,theta,backend_name,tags=[],shots=1024,hx=1.5,hz=0.1,E=[]
 		theta_full = [[ theta_i[theta_ALAy_to_symm(which_theta,n)] for which_theta in range(n*(l+1))] for theta_i in theta]
 		theta = theta_full
 	
-	return submit_circuits(theta,all_ising_Paulis_symm(n),backend_name,tags=tags+['Ising','symm','hx = '+str(hx),'hz = '+str(hz),'E = '+str(E)],shots=shots,configs_all_terms=configs_all_terms)
+	return submit_circuits(theta,all_ising_Paulis_symm(n),backend_name,tags=tags+['Ising','symm','hx = '+str(hx),'hz = '+str(hz),'E = '+str(E)],shots=shots,configs_all_terms=configs_all_terms,rand_compile=rand_compile,noise_scale=noise_scale)
 
 
 def pick_config(l,whichPauli,e_cx,e_sx,em,minNumConfigs=4,method='largest_slopes',cutoff=0):
@@ -535,9 +538,9 @@ def pick_config(l,whichPauli,e_cx,e_sx,em,minNumConfigs=4,method='largest_slopes
 
 
 ### submit and analyze in one step:
-def Ising_E_from_theta_machine(n,theta,backend_name,tags=[],shots=1024,hx=1.5,hz=0.1,E=[],configs_all_terms=[],symm=False,readout_mitigate=True,input_condensed_theta=True):
+def Ising_E_from_theta_machine(n,theta,backend_name,tags=[],shots=1024,hx=1.5,hz=0.1,E=[],configs_all_terms=[],symm=False,readout_mitigate=True,input_condensed_theta=True,rand_compile=True,noise_scale=1):
 	if symm:
-		job = submit_ising_symm(n,theta,backend_name,tags,shots,hx,hz,E,configs_all_terms,input_condensed_theta)
+		job = submit_ising_symm(n,theta,backend_name,tags,shots,hx,hz,E,configs_all_terms,input_condensed_theta,rand_compile,noise_scale)
 	else:
-		job = submit_ising(n,theta,backend_name,tags,shots,hx,hz,E,configs_all_terms)
+		job = submit_ising(n,theta,backend_name,tags,shots,hx,hz,E,configs_all_terms,rand_compile,noise_scale)
 	return ising_energy_from_job(job,readout_mitigate)
