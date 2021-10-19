@@ -44,6 +44,8 @@ If you want to test the various error mitigation techniques described in Rosenbe
 
 `library.py` contains functions that are called by functions in the other files. (Although some functions in `energy_evaluation.py` are called in `error_mitigation.py`, etc.)
 
+`compiling.py` contains functions for implementing zero noise extrapolation and randomized compiling.
+
 # How to cite this code
 
 If you use this code in your research, please consider citing the following paper:
