@@ -1,5 +1,5 @@
 # Overview
-This code allows you to reproduce the experiments performed by Rosenberg _et al_. [arXiv:2106.01264](https://arxiv.org/abs/2106.01264) (2021). Specifically, it contains functions to optimize variational ansatze both classically and hybridly, as well as functions to implement a variety of error-mitigation techniques.
+This code allows you to reproduce the experiments performed by Rosenberg _et al_. [_Quantum Science and Technology_ **7**, 015024](https://doi.org/10.1088/2058-9565/ac3b37) (2022). Specifically, it contains functions to optimize variational ansatze both classically and hybridly, as well as functions to implement a variety of error-mitigation techniques.
 
 # Dependencies
 Version numbers indicate the version I used. Other versions may also be compatible.
@@ -50,7 +50,7 @@ If you want to test the various error mitigation techniques described in Rosenbe
 
 If you use this code in your research, please consider citing the following paper:
 
->E. Rosenberg, P. Ginsparg, and P.L. McMahon. Experimental error mitigation using linear rescaling for variational quantum eigensolving with up to 20 qubits. [arXiv:2106.01264](https://arxiv.org/abs/2106.01264) (2021)
+>E. Rosenberg, P. Ginsparg, and P.L. McMahon. Experimental error mitigation using linear rescaling for variational quantum eigensolving with up to 20 qubits. [_Quantum Science and Technology_ **7**, 015024](https://doi.org/10.1088/2058-9565/ac3b37) (2022)
 
 If you have any questions or comments about this code, please contact Eliott Rosenberg at enr27--at--cornell--dot--edu.
 
